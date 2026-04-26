@@ -29,7 +29,8 @@ async function createApp() {
   app.use("/js", express.static(path.join(__dirname, "..", "public", "js")));
 
   app.use(async (request, response, next) => {
-    const sessionId = request.cookies.sid;
+    // session misuse fix, prevents setting the session before
+    const sessionId = createSessionId();
 
     if (!sessionId) {
       request.currentUser = null;
@@ -87,20 +88,21 @@ async function createApp() {
   app.post("/api/login", async (request, response) => {
     const username = String(request.body.username || "");
     const password = String(request.body.password || "");
+    //sql injection fix:
+    //replaced const query with input in user, fixed authentication in if statement
+    //used bcrypt for secure password hashing
+    const bcrypt = require("bcrypt");
 
-    const query = `
-      SELECT id, username, role, display_name
-      FROM users
-      WHERE username = '${username}' AND password = '${password}'
-    `;
-    const user = await db.get(query);
+    const user = await db.get(
+      "SELECT id, username, role, display_name, password FROM users WHERE username = ?",
+      [username]
+    );
 
-    if (!user) {
-      response.status(401).json({ error: "Invalid username or password." });
-      return;
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return response.status(401).json({ error: "Invalid username or password." });
     }
-
-    const sessionId = request.cookies.sid || createSessionId();
+    // session misuse fix, prevents setting the session before
+    const sessionId = createSessionId();
 
     await db.run("DELETE FROM sessions WHERE id = ?", [sessionId]);
     await db.run(
@@ -108,8 +110,12 @@ async function createApp() {
       [sessionId, user.id, new Date().toISOString()]
     );
 
+    //stronger cookie handling
     response.cookie("sid", sessionId, {
-      path: "/"
+      path: "/",
+      httpOnly: true,
+      sameSite: "Strict",
+      secure: true
     });
 
     response.json({
