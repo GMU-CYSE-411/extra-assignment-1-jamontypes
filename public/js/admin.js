@@ -2,32 +2,32 @@
   try {
     const user = await loadCurrentUser();
 
-    if (!user) {
-      document.getElementById("admin-warning").textContent = "Please log in first.";
+    //changed error logic, actually does security check not just a warning
+    if (!user || user.role !== "admin") {
+      document.getElementById("admin-warning").textContent =
+        "Admin access required.";
       return;
     }
-
-    if (user.role !== "admin") {
-      document.getElementById("admin-warning").textContent =
-        "The client says this is not your area, but the page still tries to load admin data.";
-    } else {
-      document.getElementById("admin-warning").textContent = "Authenticated as admin.";
-    }
+    document.getElementById("admin-warning").textContent =
+      "Authenticated as admin.";
 
     const result = await api("/api/admin/users");
-    document.getElementById("admin-users").innerHTML = result.users
-      .map(
-        (entry) => `
-          <tr>
-            <td>${entry.id}</td>
-            <td>${entry.username}</td>
-            <td>${entry.role}</td>
-            <td>${entry.displayName}</td>
-            <td>${entry.noteCount}</td>
-          </tr>
-        `
-      )
-      .join("");
+    //removal of innerHTML, dom safe reconstruction
+    const table = document.getElementById("admin-users");
+    table.replaceChildren();
+
+    result.users.forEach((e) => {
+      const tr = document.createElement("tr");
+
+      [e.id, e.username, e.role, e.displayName, e.noteCount]
+        .forEach((val) => {
+          const td = document.createElement("td");
+          td.textContent = val;
+          tr.appendChild(td);
+        });
+
+      table.appendChild(tr);
+    });
   } catch (error) {
     document.getElementById("admin-warning").textContent = error.message;
   }
