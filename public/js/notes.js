@@ -1,11 +1,21 @@
+//rebuild noteCard function to consist make it dom safe, used with the removal of innerhtml later
 function noteCard(note) {
-  return `
-    <article class="note-card">
-      <h3>${note.title}</h3>
-      <p class="note-meta">Owner: ${note.ownerUsername} | ID: ${note.id} | Pinned: ${note.pinned}</p>
-      <div class="note-body">${note.body}</div>
-    </article>
-  `;
+  const el = document.createElement("article");
+  el.className = "note-card";
+
+  const h3 = document.createElement("h3");
+  h3.textContent = note.title;
+
+  const meta = document.createElement("p");
+  meta.className = "note-meta";
+  meta.textContent = `Owner: ${note.ownerUsername} | ID: ${note.id} | Pinned: ${note.pinned}`;
+
+  const body = document.createElement("div");
+  body.className = "note-body";
+  body.textContent = note.body;
+
+  el.append(h3, meta, body);
+  return el;
 }
 
 async function loadNotes(ownerId, search) {
@@ -21,7 +31,12 @@ async function loadNotes(ownerId, search) {
 
   const result = await api(`/api/notes?${query.toString()}`);
   const notesList = document.getElementById("notes-list");
-  notesList.innerHTML = result.notes.map(noteCard).join("");
+  //removal of innerHTML
+  const notesList = document.getElementById("notes-list");
+  notesList.replaceChildren();
+  result.notes.forEach(note => {
+    notesList.appendChild(noteCard(note));
+});
 }
 
 (async function bootstrapNotes() {
