@@ -1,12 +1,4 @@
-(function setupFixationHelper() {
-  const params = new URLSearchParams(window.location.search);
-  const fixedSession = params.get("sid");
-
-  if (fixedSession) {
-    document.cookie = `sid=${fixedSession}; path=/`;
-  }
-})();
-
+//removed setupFixationHelper(), only the server should be issuing session ids
 document.getElementById("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
 
