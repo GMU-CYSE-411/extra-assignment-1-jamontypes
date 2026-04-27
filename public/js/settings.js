@@ -1,5 +1,6 @@
 async function loadSettings(userId) {
-  const result = await api(`/api/settings?userId=${encodeURIComponent(userId)}`);
+  //changed result so the user can't changer userId
+  const result = await api("/api/settings");
   const settings = result.settings;
 
   document.getElementById("settings-form-user-id").value = settings.userId;
@@ -10,11 +11,19 @@ async function loadSettings(userId) {
   form.elements.theme.value = settings.theme;
   form.elements.statusMessage.value = settings.statusMessage;
   form.elements.emailOptIn.checked = Boolean(settings.emailOptIn);
-  document.getElementById("status-preview").innerHTML = `
-    <p><strong>${settings.displayName}</strong></p>
-    <p>${settings.statusMessage}</p>
-  `;
+ 
+  //removal of innerHTML and replaced with dom safe reconstruction
+  const preview = document.getElementById("status-preview");
+  preview.replaceChildren();
 
+  const name = document.createElement("p");
+  const strong = document.createElement("strong");
+  strong.textContent = settings.displayName;
+  name.appendChild(strong);
+  const msg = document.createElement("p");
+  msg.textContent = settings.statusMessage;
+  preview.append(name, msg);
+  
   writeJson("settings-output", settings);
 }
 
