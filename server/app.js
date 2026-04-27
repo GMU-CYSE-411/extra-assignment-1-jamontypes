@@ -139,9 +139,10 @@ async function createApp() {
   });
 
   app.get("/api/notes", requireAuth, async (request, response) => {
-    const ownerId = request.query.ownerId || request.currentUser.id;
+    //removing query 
+    const ownerId = request.currentUser.id;
     const search = request.query.search || "";
-
+    //turned notes.owner_id = ${ownerID} to = ? to prevent sql injection
     const notes = await db.all(`
       SELECT
         notes.id,
@@ -153,16 +154,19 @@ async function createApp() {
         notes.created_at AS createdAt
       FROM notes
       JOIN users ON users.id = notes.owner_id
-      WHERE notes.owner_id = ${ownerId}
-        AND (notes.title LIKE '%${search}%' OR notes.body LIKE '%${search}%')
+      WHERE notes.owner_id = ?
+        AND (notes.title LIKE ? OR notes.body LIKE ?)
       ORDER BY notes.pinned DESC, notes.id DESC
-    `);
+    `,
+    [ownerId, `%${search}%`, `%${search}%`]
+    );
 
     response.json({ notes });
   });
 
   app.post("/api/notes", requireAuth, async (request, response) => {
-    const ownerId = Number(request.body.ownerId || request.currentUser.id);
+    //removes request.body.ownerId, over trusting client input
+    const ownerId = request.currentUser.id;
     const title = String(request.body.title || "");
     const body = String(request.body.body || "");
     const pinned = request.body.pinned ? 1 : 0;
@@ -179,7 +183,8 @@ async function createApp() {
   });
 
   app.get("/api/settings", requireAuth, async (request, response) => {
-    const userId = Number(request.query.userId || request.currentUser.id);
+    //same removal of request.body.userId, over-trusting
+    const userId = request.currentUser.id;
 
     const settings = await db.get(
       `
