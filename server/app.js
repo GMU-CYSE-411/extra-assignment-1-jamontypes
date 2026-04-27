@@ -3,6 +3,7 @@ const path = require("path");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const { DEFAULT_DB_FILE, openDatabase } = require("../db");
+const { request } = require("http");
 
 function sendPublicFile(response, fileName) {
   response.sendFile(path.join(__dirname, "..", "public", fileName));
@@ -34,8 +35,7 @@ async function createApp() {
 
     if (!sessionId) {
       request.currentUser = null;
-      next();
-      return;
+      return next();
     }
 
     const row = await db.get(
@@ -102,9 +102,9 @@ async function createApp() {
       return response.status(401).json({ error: "Invalid username or password." });
     }
     // session misuse fix, prevents setting the session before
-    const sessionId = createSessionId();
+    const sessionId = request.cookies.sid;
 
-    await db.run("DELETE FROM sessions WHERE id = ?", [sessionId]);
+    await db.run("DELETE FROM sessions WHERE user_id = ?", [user.id]);
     await db.run(
       "INSERT INTO sessions (id, user_id, created_at) VALUES (?, ?, ?)",
       [sessionId, user.id, new Date().toISOString()]
@@ -207,7 +207,8 @@ async function createApp() {
   });
 
   app.post("/api/settings", requireAuth, async (request, response) => {
-    const userId = Number(request.body.userId || request.currentUser.id);
+    //changed userId to stop over trusting client side input
+    const userId = request.currentUser.id;
     const displayName = String(request.body.displayName || "");
     const statusMessage = String(request.body.statusMessage || "");
     const theme = String(request.body.theme || "classic");
@@ -221,9 +222,10 @@ async function createApp() {
 
     response.json({ ok: true });
   });
-
-  app.get("/api/settings/toggle-email", requireAuth, async (request, response) => {
-    const enabled = request.query.enabled === "1" ? 1 : 0;
+  //changed get to post, changing something not pulling
+  app.post("/api/settings/toggle-email", requireAuth, async (request, response) => {
+    //removed query to body
+    const enabled = request.body.enabled === "1" ? 1 : 0;
 
     await db.run("UPDATE settings SET email_opt_in = ? WHERE user_id = ?", [
       enabled,
@@ -238,6 +240,11 @@ async function createApp() {
   });
 
   app.get("/api/admin/users", requireAuth, async (_request, response) => {
+    // added admin authentication
+    if (request.currentUser.role !== "admin"){
+      return response.status(403).json({ error: "Forbidden" });
+    }
+    
     const users = await db.all(`
       SELECT
         users.id,
